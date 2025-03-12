@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Buddy Diary</title>
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
+    <link href='https://fonts.googleapis.com/css?family=Playfair+Display:400,400i,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+
+<body>
+    <!-- Header with Logo and Title -->
+    <div class="chat-header">
+        <div class="title-container">
+            <img src="{{ url_for('static', filename='gifs/logo-light.gif') }}" alt="Logo" class="logo-gif" id="logo">
+            <h1 class="app-name">Buddy Diary</h1>
+        </div>
+        <div class="calendar-container">
+            <div class="calendar-icon">📅</div>
+            <div class="calendar-dropdown">
+                <div class="calendar-header">
+                    <span class="month">March 2025</span>
+                </div>
+                <div class="calendar-grid">
+                    <span>1</span><span class="active">2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span>
+                    <span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span>
+                    <span>15</span><span>16</span><span>17</span><span class="active">18</span><span>19</span><span>20</span><span>21</span>
+                    <span>22</span><span>23</span><span>24</span><span>25</span><span>26</span><span>27</span><span>28</span>
+                    <span>29</span><span>30</span><span>31</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Container -->
+    <div class="chat-container" id="chat-container">
+        <!-- Chat messages will be appended here via JavaScript -->
+    </div>
+
+    <!-- Input Area -->
+    <div class="input-container">
+        <form id="chat-form" method="post">
+            <input type="text" 
+                   name="diary_entry" 
+                   id="diary-entry" 
+                   placeholder="Type your message..." 
+                   required="required" />
+            <button type="submit">➤</button>
+        </form>
+        <div class="gif-preview">
+            <img src="{{ url_for('static', filename='gifs/waiting.gif') }}" alt="Default GIF" class="response-gif" id="response-gif">
+        </div>
+    </div>
+
+    <!-- Theme Toggle -->
+    <button class="theme-toggle">☀️</button>
+
+    <script>
+        const themeToggle = document.querySelector('.theme-toggle');
+        const logo = document.querySelector('#logo');
+        const lightLogo = "{{ url_for('static', filename='gifs/logo-light.gif') }}";
+        const darkLogo = "{{ url_for('static', filename='gifs/logo-dark.gif') }}";
+        const chatForm = document.querySelector('#chat-form');
+        const chatContainer = document.querySelector('#chat-container');
+        const diaryEntry = document.querySelector('#diary-entry');
+        const responseGif = document.querySelector('#response-gif');
+
+        // Theme toggle
+        themeToggle.addEventListener('click', () => {
+            document.body.classList.toggle('dark');
+            themeToggle.textContent = document.body.classList.contains('dark') ? '☀️' : '🌙';
+            logo.src = document.body.classList.contains('dark') ? darkLogo : lightLogo;
+        });
+
+        // Handle form submission
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userInput = diaryEntry.value.trim();
+            if (!userInput) return;
+
+            // Append user message
+            const userMessage = document.createElement('div');
+            userMessage.classList.add('chat-message', 'user-message');
+            userMessage.innerHTML = `<p>${userInput}</p>`;
+            chatContainer.appendChild(userMessage);
+
+            // Clear input
+            diaryEntry.value = '';
+
+            // Fetch AI response
+            try {
+                const formData = new FormData();
+                formData.append('diary_entry', userInput); // Match Flask's request.form key
+                console.log('Sending request with input:', userInput);
+                const response = await fetch('{{ url_for("predict") }}', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! Status: ${response.status}, Response: ${errorText}`);
+                }
+
+                const data = await response.json();
+                console.log('Received response:', data);
+
+                if (data.error) {
+                    throw new Error(`Server error: ${data.error}`);
+                }
+
+                // Append AI message
+                const aiMessage = document.createElement('div');
+                aiMessage.classList.add('chat-message', 'ai-message');
+                aiMessage.innerHTML = `<p>${data.response}</p>`;
+                chatContainer.appendChild(aiMessage);
+
+                // Update the bottom-left GIF
+                responseGif.src = "{{ url_for('static', filename='gifs/') }}" + data.gif;
+                responseGif.alt = data.gif === "Happy.gif" ? "Positive GIF" : "Negative GIF";
+
+                // Scroll to bottom
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            } catch (error) {
+                console.error('Error fetching response:', error);
+                const errorMessage = document.createElement('div');
+                errorMessage.classList.add('chat-message', 'ai-message');
+                errorMessage.innerHTML = `<p>Sorry, something went wrong. Please try again. (Error: ${error.message})</p>`;
+                chatContainer.appendChild(errorMessage);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            }
+        });
+    </script>
+</body>
+</html>
